@@ -1,8 +1,8 @@
-Package: nguyenvinnh
-Name: fakelocation
+Package: com.nguyenvinh.simgpsinapp
+Name: SimGPS-InApp
 Version: 0.0.1
 Architecture: iphoneos-arm
-Description: An awesome MobileSubstrate tweak!
+Description: Fake GPS location directly inside iOS apps
 Maintainer: Nguyen Vinh
 Author: Nguyen Vinh
 Section: Tweaks

@@ -3,10 +3,10 @@ INSTALL_TARGET_PROCESSES = SpringBoard
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = fakelocation
+TWEAK_NAME = SimGPSInApp
 
-fakelocation_FILES = Tweak.x FLLocationHook.x FLLocationConfig.m FLLocationEngine.m FLLocationService.m FLUI.m
-fakelocation_CFLAGS = -fobjc-arc
-fakelocation_FRAMEWORKS = CoreLocation UIKit CoreGraphics
+SimGPSInApp_FILES = Tweak.x FLLocationHook.x FLLocationConfig.m FLLocationEngine.m FLLocationService.m FLUI.m
+SimGPSInApp_CFLAGS = -fobjc-arc
+SimGPSInApp_FRAMEWORKS = CoreLocation UIKit CoreGraphics
 
 include $(THEOS_MAKE_PATH)/tweak.mk

@@ -211,7 +211,7 @@ static BOOL FLParseCoordinateString(NSString *input, double *outLat, double *out
 
         // UIAlertController
         UIAlertController *alert =
-            [UIAlertController alertControllerWithTitle:@"📍 Fake Location"
+            [UIAlertController alertControllerWithTitle:@"📍 SimGPS-InApp"
                                                message:@"Dán tọa độ (Vĩ độ, Kinh độ)\nvỉ dụ: 35.7619257, 139.1578853"
                                         preferredStyle:UIAlertControllerStyleAlert];
 
@@ -235,7 +235,7 @@ static BOOL FLParseCoordinateString(NSString *input, double *outLat, double *out
                 engine.enabled = YES;
             } else {
                 // Nếu người dùng nhập sai định dạng thì báo lỗi hoặc không lưu
-                NSLog(@"[FakeLocation] Chuỗi tọa độ không hợp lệ: %@", rawText);
+                NSLog(@"[SimGPS-InApp] Chuỗi tọa độ không hợp lệ: %@", rawText);
             }
             [self updateButtonState];
             [self dismissAlertWindow];
@@ -281,16 +281,16 @@ static BOOL FLParseCoordinateString(NSString *input, double *outLat, double *out
 
 - (void)showStatus {
     FLLocationEngine *engine = [FLLocationEngine sharedEngine];
-    NSLog(@"[FakeLocation] enabled=%@", engine.isEnabled ? @"YES" : @"NO");
+    NSLog(@"[SimGPS-InApp] enabled=%@", engine.isEnabled ? @"YES" : @"NO");
 }
 
 - (void)showLocation {
     CLLocation *loc = [[FLLocationEngine sharedEngine] fakeLocation];
     if (!loc) {
-        NSLog(@"[FakeLocation] no fake location configured");
+        NSLog(@"[SimGPS-InApp] no fake location configured");
         return;
     }
-    NSLog(@"[FakeLocation] lat=%.6f lon=%.6f alt=%.2f",
+    NSLog(@"[SimGPS-InApp] lat=%.6f lon=%.6f alt=%.2f",
           loc.coordinate.latitude,
           loc.coordinate.longitude,
           loc.altitude);
