@@ -16,7 +16,7 @@ static void FLDeliverFakeLocation(CLLocationManager *manager) {
     CLLocation *location = service.currentLocation;
     id<CLLocationManagerDelegate> delegate = manager.delegate;
 
-    if (!location || !delegate) {
+    if (!location ||!delegate) {
         return;
     }
 
@@ -37,7 +37,7 @@ static void FLTimerFired(NSTimer *timer) {
     if (!service.isEnabled) {
         return;
     }
-    
+
     @synchronized(activeManagers) {
         for (CLLocationManager *manager in activeManagers) {
             FLDeliverFakeLocation(manager);
@@ -47,13 +47,20 @@ static void FLTimerFired(NSTimer *timer) {
 
 static void FLStartTimerIfNeeded(void) {
     if (!updateTimer) {
-        updateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                       target:[NSBlockOperation blockOperationWithBlock:^{
-            FLTimerFired(nil);
-        }]
-                                                     selector:@selector(main)
-                                                     userInfo:nil
-                                                      repeats:YES];
+        if (@available(iOS 10.0, *)) {
+            updateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+                FLTimerFired(timer);
+            }];
+        } else {
+            // Fallback cho iOS cũ
+            updateTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                           target:[NSBlockOperation blockOperationWithBlock:^{
+                FLTimerFired(nil);
+            }]
+                                                         selector:@selector(main)
+                                                         userInfo:nil
+                                                          repeats:YES];
+        }
     }
 }
 
