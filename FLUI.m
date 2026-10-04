@@ -211,7 +211,7 @@ static BOOL FLParseCoordinateString(NSString *input, double *outLat, double *out
 
         // UIAlertController
         UIAlertController *alert =
-            [UIAlertController alertControllerWithTitle:@"📍 SimGPS-InApp"
+            [UIAlertController alertControllerWithTitle:@" SimGPS-InApp"
                                                message:@"Dán tọa độ (Vĩ độ, Kinh độ)\nvỉ dụ: 35.7619257, 139.1578853"
                                         preferredStyle:UIAlertControllerStyleAlert];
 
