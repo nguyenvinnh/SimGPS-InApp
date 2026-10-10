@@ -57,16 +57,15 @@ static void FLDeliverFakeHeading(CLLocationManager *manager) {
         return;
     }
 
+    // Đảm bảo luôn có góc heading hợp lệ để vẽ hình nón (kể cả đứng yên tĩnh)
     CLLocationDirection course = [FLLocationConfig sharedConfig].course;
-    if (course < 0.0) {
-        return;
-    }
+    double validHeading = (course >= 0.0) ? course : 0.0;
 
     if (![delegate respondsToSelector:@selector(locationManager:didUpdateHeading:)]) {
         return;
     }
 
-    FLFakeHeading *heading = [[FLFakeHeading alloc] initWithHeading:course];
+    FLFakeHeading *heading = [[FLFakeHeading alloc] initWithHeading:validHeading];
     id<CLLocationManagerDelegate> capturedDelegate = delegate;
     dispatch_async(dispatch_get_main_queue(), ^{
         [capturedDelegate locationManager:manager didUpdateHeading:heading];
@@ -209,10 +208,22 @@ static void FLSwizzleDidUpdateToLocation(Class cls) {
 static void FLSwizzleDidUpdateHeading(Class cls) {
     SEL selector = @selector(locationManager:didUpdateHeading:);
     Method originalMethod = class_getInstanceMethod(cls, selector);
-    if (!originalMethod) return;
 
     NSString *key = [NSString stringWithFormat:@"%@_didUpdateHeading", NSStringFromClass(cls)];
     if (origIMPMap[key]) return;
+
+    if (!originalMethod) {
+        // Nếu delegate của app chưa implement locationManager:didUpdateHeading:, tự động bổ sung vào class!
+        // Đây chính là lý do Google Maps không nhận được callback la bàn!
+        id addedBlock = ^(id selfObj, CLLocationManager *manager, CLHeading *heading) {
+            // Không làm gì thêm, chỉ cần delegate tiếp nhận thành công
+        };
+        const char *types = "v@:@@";
+        IMP addedIMP = imp_implementationWithBlock(addedBlock);
+        class_addMethod(cls, selector, addedIMP, types);
+        origIMPMap[key] = [NSValue valueWithPointer:addedIMP];
+        return;
+    }
 
     IMP origIMP = method_getImplementation(originalMethod);
     origIMPMap[key] = [NSValue valueWithPointer:origIMP];
@@ -222,9 +233,8 @@ static void FLSwizzleDidUpdateHeading(Class cls) {
         CLHeading *finalHeading = heading;
         if (service.isEnabled) {
             CLLocationDirection course = [FLLocationConfig sharedConfig].course;
-            if (course >= 0.0) {
-                finalHeading = [[FLFakeHeading alloc] initWithHeading:course];
-            }
+            double validHeading = (course >= 0.0) ? course : 0.0;
+            finalHeading = [[FLFakeHeading alloc] initWithHeading:validHeading];
         }
         IMP storedIMP = [origIMPMap[key] pointerValue];
         if (storedIMP) {
@@ -358,6 +368,14 @@ static void FLSwizzleDelegateMethodsIfNeeded(Class cls) {
     return %orig;
 }
 
++ (BOOL)headingAvailable {
+    FLLocationService *service = [FLLocationService sharedService];
+    if (service.isFakeAuthorizationEnabled || service.isEnabled) {
+        return YES;
+    }
+    return %orig;
+}
+
 - (CLHeading *)heading {
     FLLocationService *service = [FLLocationService sharedService];
     if (service.isEnabled) {
@@ -375,6 +393,16 @@ static void FLSwizzleDelegateMethodsIfNeeded(Class cls) {
         [activeManagers addObject:self];
     }
     FLDeliverFakeHeading(self);
+}
+
+- (void)setHeadingFilter:(CLLocationDegrees)filter {
+    // Nếu ứng dụng đang dùng tính năng fake location, đặt filter cực nhỏ để Google Maps cập nhật mượt mà
+    FLLocationService *service = [FLLocationService sharedService];
+    if (service.isEnabled) {
+        %orig(kCLHeadingFilterNone);
+        return;
+    }
+    %orig(filter);
 }
 
 - (void)requestWhenInUseAuthorization {

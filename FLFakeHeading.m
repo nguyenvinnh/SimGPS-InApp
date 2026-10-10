@@ -26,19 +26,23 @@
 }
 
 - (CLLocationDirection)headingAccuracy {
+    // 3.0 độ là độ chính xác rất cao của la bàn
     return 3.0;
 }
 
 - (CLLocationDirection)x {
-    return 0.0;
+    // Chuyển đổi heading thành vector từ trường mô phỏng (microteslas)
+    double rad = _headingVal * M_PI / 180.0;
+    return sin(rad) * 25.0;
 }
 
 - (CLLocationDirection)y {
-    return 0.0;
+    double rad = _headingVal * M_PI / 180.0;
+    return cos(rad) * 25.0;
 }
 
 - (CLLocationDirection)z {
-    return 0.0;
+    return -40.0;
 }
 
 - (NSDate *)timestamp {

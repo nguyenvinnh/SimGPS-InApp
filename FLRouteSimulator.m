@@ -193,6 +193,9 @@ static double FLBearingDegrees(CLLocationCoordinate2D from, CLLocationCoordinate
     config.enabled = YES;
     [config saveConfig];
 
+    // Phát ngay toạ độ xuất phát cho ứng dụng mục tiêu nhận diện
+    FLBroadcastLocationAndHeading();
+
     return YES;
 }
 
@@ -232,9 +235,29 @@ static double FLBearingDegrees(CLLocationCoordinate2D from, CLLocationCoordinate
     [self stopTimer];
 }
 
+- (void)endSimulation {
+    [self stopTimer];
+    self.state = FLRouteStateIdle;
+    self.currentSpeed_mps = 0.0;
+    self.currentSpeedKmh = 0.0;
+    self.progress = 0.0;
+    self.routeData = nil;
+    self.waypointsCount = 0;
+    self.routeName = @"";
+    self.statusDescription = @"Đã về vị trí tĩnh";
+
+    // Khôi phục toạ độ giả lập tĩnh thông thường
+    FLLocationConfig *config = [FLLocationConfig sharedConfig];
+    [config restoreStaticCoordinate];
+
+    // Phát broadcast vị trí tĩnh ngay lập tức
+    FLBroadcastLocationAndHeading();
+}
+
 - (void)startTimer {
     [self stopTimer];
-    self.simulationTimer = [NSTimer scheduledTimerWithTimeInterval:0.2
+    // Tần số cập nhật 10Hz (0.1 giây) giúp Google Maps và Apple Maps nội suy chuyển động siêu mượt
+    self.simulationTimer = [NSTimer scheduledTimerWithTimeInterval:0.1
                                                             target:self
                                                           selector:@selector(simulationStep)
                                                           userInfo:nil
@@ -248,7 +271,7 @@ static double FLBearingDegrees(CLLocationCoordinate2D from, CLLocationCoordinate
     }
 }
 
-// MARK: - Step Animation
+// MARK: - Step Animation & Kinematic Speed Controller
 
 - (void)simulationStep {
     if (self.state != FLRouteStateRunning || !self.hasValidRoute) {
@@ -277,39 +300,94 @@ static double FLBearingDegrees(CLLocationCoordinate2D from, CLLocationCoordinate
         return;
     }
 
-    // 1. Tính toán hệ số góc cua (Lookahead Curvature Factor)
-    CLLocationCoordinate2D curCoord = [self coordinateAtDistance:self.currentDistance];
-    CLLocationCoordinate2D lookAhead1 = [self coordinateAtDistance:fmin(totalDist, self.currentDistance + 10.0)];
-    CLLocationCoordinate2D lookAhead2 = [self coordinateAtDistance:fmin(totalDist, self.currentDistance + 22.0)];
+    // 1. Giới hạn tốc độ cấu hình tối đa (m/s)
+    double userMaxKmh = (self.maxSpeedKmh > 5.0) ? self.maxSpeedKmh : 50.0;
+    double maxSpeed_mps = userMaxKmh / 3.6;
 
-    double b1 = FLBearingDegrees(curCoord, lookAhead1);
-    double b2 = FLBearingDegrees(lookAhead1, lookAhead2);
-    double turnAngle = fabs(b2 - b1);
-    if (turnAngle > 180.0) turnAngle = 360.0 - turnAngle;
+    // Gia tốc giảm tốc (m/s^2) và gia tốc tăng tốc (m/s^2)
+    const double a_brake = 2.8;
+    const double a_accel = 1.6;
+    const double dt = 0.1; // Chu kỳ timer 100ms (10Hz)
 
-    double curveFactor = fmax(0.35, 1.0 - (turnAngle / 75.0));
+    // 2. Thuật toán Lookahead Corner Braking Point:
+    double targetSpeed_mps = maxSpeed_mps;
+    BOOL isApproachingTurn = NO;
 
-    // 2. Tốc độ mục tiêu & Hard Clamp
-    double maxSpeed_mps = (self.maxSpeedKmh > 0 ? self.maxSpeedKmh : 50.0) / 3.6;
-    double targetSpeed_mps = maxSpeed_mps * curveFactor;
+    double lookaheadDistances[] = { 10.0, 20.0, 35.0, 55.0, 80.0, 110.0 };
+    int numChecks = sizeof(lookaheadDistances) / sizeof(lookaheadDistances[0]);
 
-    double remainDist = totalDist - self.currentDistance;
-    if (remainDist < 35.0) {
-        targetSpeed_mps *= fmax(0.15, remainDist / 35.0);
+    for (int i = 0; i < numChecks; i++) {
+        double d_forward = lookaheadDistances[i];
+        double d_corner = self.currentDistance + d_forward;
+        if (d_corner >= totalDist) break;
+
+        CLLocationCoordinate2D pCorner = [self coordinateAtDistance:d_corner];
+        CLLocationCoordinate2D pBefore = [self coordinateAtDistance:fmax(0.0, d_corner - 6.0)];
+        CLLocationCoordinate2D pAfter  = [self coordinateAtDistance:fmin(totalDist, d_corner + 6.0)];
+
+        double bearingIn = FLBearingDegrees(pBefore, pCorner);
+        double bearingOut = FLBearingDegrees(pCorner, pAfter);
+        double turnAngle = fabs(bearingOut - bearingIn);
+        if (turnAngle > 180.0) turnAngle = 360.0 - turnAngle;
+
+        double cornerLimitKmh = userMaxKmh;
+        if (turnAngle >= 75.0) {
+            cornerLimitKmh = fmin(userMaxKmh, 32.0);
+        } else if (turnAngle >= 55.0) {
+            cornerLimitKmh = fmin(userMaxKmh, 45.0);
+        } else if (turnAngle >= 35.0) {
+            cornerLimitKmh = fmin(userMaxKmh, 60.0);
+        } else if (turnAngle >= 20.0) {
+            cornerLimitKmh = fmin(userMaxKmh, 75.0);
+        }
+
+        double cornerLimit_mps = cornerLimitKmh / 3.6;
+        double safeSpeed_mps = sqrt((cornerLimit_mps * cornerLimit_mps) + (2.0 * a_brake * d_forward));
+
+        if (safeSpeed_mps < targetSpeed_mps) {
+            targetSpeed_mps = safeSpeed_mps;
+            if (turnAngle >= 35.0) {
+                isApproachingTurn = YES;
+            }
+        }
     }
 
-    // 3. Quán tính xe (Inertia)
-    self.currentSpeed_mps += (targetSpeed_mps - self.currentSpeed_mps) * 0.15;
+    // Giảm tốc độ an toàn khi gần về đích
+    double remainDist = totalDist - self.currentDistance;
+    double stopSafeSpeed_mps = sqrt(2.0 * a_brake * fmax(1.0, remainDist));
+    if (stopSafeSpeed_mps < targetSpeed_mps) {
+        targetSpeed_mps = stopSafeSpeed_mps;
+    }
 
-    // Hard clamp
-    if (self.currentSpeed_mps > maxSpeed_mps) self.currentSpeed_mps = maxSpeed_mps;
-    if (self.currentSpeed_mps < 1.0) self.currentSpeed_mps = 1.0;
+    if (targetSpeed_mps > maxSpeed_mps) targetSpeed_mps = maxSpeed_mps;
+    if (targetSpeed_mps < 2.5) targetSpeed_mps = 2.5;
+
+    // 4. Cập nhật tốc độ xe theo động lực học
+    if (self.currentSpeed_mps < targetSpeed_mps) {
+        self.currentSpeed_mps += a_accel * dt;
+        if (self.currentSpeed_mps > targetSpeed_mps) {
+            self.currentSpeed_mps = targetSpeed_mps;
+        }
+    } else if (self.currentSpeed_mps > targetSpeed_mps) {
+        self.currentSpeed_mps -= a_brake * dt;
+        if (self.currentSpeed_mps < targetSpeed_mps) {
+            self.currentSpeed_mps = targetSpeed_mps;
+        }
+    }
+
+    if (self.currentSpeed_mps > maxSpeed_mps) {
+        self.currentSpeed_mps = maxSpeed_mps;
+    }
+    if (self.currentSpeed_mps < 1.0) {
+        self.currentSpeed_mps = 1.0;
+    }
 
     self.currentSpeedKmh = self.currentSpeed_mps * 3.6;
-    if (self.currentSpeedKmh > self.maxSpeedKmh) self.currentSpeedKmh = self.maxSpeedKmh;
+    if (self.currentSpeedKmh > userMaxKmh) {
+        self.currentSpeedKmh = userMaxKmh;
+    }
 
-    // 4. Cập nhật cự ly
-    double dt = 0.2;
+    // 5. Cập nhật cự ly di chuyển
     self.currentDistance += (self.currentSpeed_mps * dt);
     if (self.currentDistance >= totalDist) {
         self.currentDistance = totalDist;
@@ -318,26 +396,31 @@ static double FLBearingDegrees(CLLocationCoordinate2D from, CLLocationCoordinate
     double currentAlt = 0.0;
     CLLocationCoordinate2D newCoord = [self coordinateAtDistance:self.currentDistance altitude:&currentAlt];
 
-    // 6. Hướng tầm nhìn
-    CLLocationCoordinate2D forwardCoord = [self coordinateAtDistance:fmin(totalDist, self.currentDistance + 4.0)];
+    // 6. Xoay góc la bàn / hướng nhìn tầm nhìn:
+    // Tự động điều chỉnh khoảng cách ngắm hướng phía trước tỷ lệ theo tốc độ (3.0m - 12.0m)
+    // để tránh bị giật góc hay bị dại khi đi qua các đoạn cua gấp trong Google Maps
+    double lookAheadHeadingDist = fmax(3.5, fmin(12.0, self.currentSpeed_mps * 0.8));
+    CLLocationCoordinate2D forwardCoord = [self coordinateAtDistance:fmin(totalDist, self.currentDistance + lookAheadHeadingDist)];
     double targetBearing = FLBearingDegrees(newCoord, forwardCoord);
 
     double diff = targetBearing - self.currentCourse;
     while (diff > 180.0) diff -= 360.0;
     while (diff < -180.0) diff += 360.0;
-    self.currentCourse += diff * 0.35;
+    
+    // Hệ số nội suy 0.20 ở chu kỳ 10Hz tạo cảm giác xoay la bàn rất đầm và êm ái
+    self.currentCourse += diff * 0.20;
     while (self.currentCourse < 0.0) self.currentCourse += 360.0;
     while (self.currentCourse >= 360.0) self.currentCourse -= 360.0;
 
     self.progress = totalDist > 0 ? (self.currentDistance / totalDist) : 0.0;
 
-    if (curveFactor < 0.7) {
-        self.statusDescription = [NSString stringWithFormat:@"Đang vào cua (%.0f km/h)", self.currentSpeedKmh];
+    if (isApproachingTurn) {
+        self.statusDescription = [NSString stringWithFormat:@"Hãm phanh vào cua (%.0f km/h)", self.currentSpeedKmh];
     } else {
-        self.statusDescription = [NSString stringWithFormat:@"Đang chạy (%.0f km/h)", self.currentSpeedKmh];
+        self.statusDescription = [NSString stringWithFormat:@"Đang chạy đều (%.0f km/h)", self.currentSpeedKmh];
     }
 
-    // 7. Đồng bộ config
+    // 7. Đồng bộ sang Location Engine & Config
     FLLocationConfig *config = [FLLocationConfig sharedConfig];
     config.latitude = newCoord.latitude;
     config.longitude = newCoord.longitude;
