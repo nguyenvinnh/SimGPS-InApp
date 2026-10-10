@@ -6,6 +6,7 @@
 + (instancetype)sharedEngine;
 
 @property (nonatomic, assign, getter=isEnabled) BOOL enabled;
+@property (nonatomic, assign) BOOL fakeAuthorization;
 
 - (void)setLatitude:(CLLocationDegrees)latitude
           longitude:(CLLocationDegrees)longitude;

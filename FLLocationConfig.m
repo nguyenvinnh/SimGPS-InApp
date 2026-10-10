@@ -14,14 +14,15 @@
 }
 
 - (void)reset {
-  self.enabled = NO;
-  self.latitude = 0.0;
-  self.longitude = 0.0;
-  self.altitude = 0.0;
-  self.horizontalAccuracy = 10.0;
-  self.verticalAccuracy = 10.0;
-  self.speed = -1.0;
-  self.course = -1.0;
+  self.enabled = YES;
+  self.fakeAuthorization = YES;
+  self.latitude = 21.028511;
+  self.longitude = 105.854444;
+  self.altitude = 10.0;
+  self.horizontalAccuracy = 5.0;
+  self.verticalAccuracy = 5.0;
+  self.speed = 0.0;
+  self.course = 0.0;
 }
 
 - (void)loadSavedConfig {
@@ -30,6 +31,7 @@
     self.latitude = [defaults doubleForKey:@"FLLatitude"];
     self.longitude = [defaults doubleForKey:@"FLLongitude"];
     self.enabled = [defaults boolForKey:@"FLEnabled"];
+    self.fakeAuthorization = [defaults objectForKey:@"FLFakeAuth"] ? [defaults boolForKey:@"FLFakeAuth"] : YES;
     // Load thêm các field mở rộng nếu có
     if ([defaults objectForKey:@"FLAltitude"]) {
       self.altitude = [defaults doubleForKey:@"FLAltitude"];
@@ -38,6 +40,10 @@
       self.speed = [defaults doubleForKey:@"FLSpeed"];
       self.course = [defaults doubleForKey:@"FLCourse"];
     }
+  } else {
+    // Lần đầu mở ứng dụng: tự động kích hoạt và lưu giá trị mặc định
+    [self reset];
+    [self saveConfig];
   }
 }
 
@@ -46,6 +52,7 @@
   [defaults setDouble:self.latitude forKey:@"FLLatitude"];
   [defaults setDouble:self.longitude forKey:@"FLLongitude"];
   [defaults setBool:self.enabled forKey:@"FLEnabled"];
+  [defaults setBool:self.fakeAuthorization forKey:@"FLFakeAuth"];
   [defaults setDouble:self.altitude forKey:@"FLAltitude"];
   [defaults setDouble:self.horizontalAccuracy forKey:@"FLHorizontalAccuracy"];
   [defaults setDouble:self.verticalAccuracy forKey:@"FLVerticalAccuracy"];

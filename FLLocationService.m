@@ -38,6 +38,10 @@
     return [FLLocationEngine sharedEngine].isEnabled;
 }
 
+- (BOOL)isFakeAuthorizationEnabled {
+    return [FLLocationEngine sharedEngine].fakeAuthorization;
+}
+
 - (CLLocation *)currentLocation {
     return [[FLLocationEngine sharedEngine] fakeLocation];
 }

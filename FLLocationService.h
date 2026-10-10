@@ -12,6 +12,7 @@
 - (void)setLocation:(CLLocation *)location;
 - (void)reset;
 - (BOOL)isEnabled;
+- (BOOL)isFakeAuthorizationEnabled;
 - (CLLocation *)currentLocation;
 
 @end

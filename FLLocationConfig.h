@@ -4,6 +4,7 @@
 @interface FLLocationConfig : NSObject
 
 @property (nonatomic, assign, getter=isEnabled) BOOL enabled;
+@property (nonatomic, assign) BOOL fakeAuthorization;
 @property (nonatomic, assign) CLLocationDegrees latitude;
 @property (nonatomic, assign) CLLocationDegrees longitude;
 @property (nonatomic, assign) CLLocationDistance altitude;

@@ -24,6 +24,15 @@
   [[FLLocationConfig sharedConfig] saveConfig];
 }
 
+- (BOOL)fakeAuthorization {
+  return [FLLocationConfig sharedConfig].fakeAuthorization;
+}
+
+- (void)setFakeAuthorization:(BOOL)fakeAuthorization {
+  [FLLocationConfig sharedConfig].fakeAuthorization = fakeAuthorization;
+  [[FLLocationConfig sharedConfig] saveConfig];
+}
+
 - (void)setLatitude:(CLLocationDegrees)latitude
           longitude:(CLLocationDegrees)longitude {
   FLLocationConfig *config = [FLLocationConfig sharedConfig];
