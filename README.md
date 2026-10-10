@@ -11,6 +11,7 @@ Dự án iOS Tweak giả mạo vị trí GPS (Fake Location) trực tiếp trong
 ##  Chức Năng
 
 * **Thay đổi tọa độ tùy chỉnh:** Thay đổi vị trí GPS hiện tại của ứng dụng thành bất kỳ tọa độ nào mong muốn (Vĩ độ / Kinh độ).
+* Mô phỏng lộ trình (Route Simulation): Cho phép thiết lập một danh sách các điểm mốc (waypoints) và tự động mô phỏng quá trình di chuyển liên tục giữa các điểm với tốc độ tùy chỉnh (đi bộ, lái xe, v.v.).
 * **Định vị liên tục:** Tự động duy trì và phát tọa độ giả lập liên tục (tương thích tốt với các dịch vụ bản đồ như Google Maps, Apple Maps, v.v.).
 
 ---
